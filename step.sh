@@ -27,7 +27,7 @@ echo
 echo "--- Warning messages from tidy command (disregard):"
 
 # construct an XHTML doc to contain the extracted raw URL anchor tags
-temp_doc=$(curl -sSL "${gist_url}" | grep -Pzoi '<a [^>]+>\s*Raw\s*</a>' | tidy -quiet)
+temp_doc=$(curl -sSL "${gist_url}" | tac | tac | grep -Pzoi '<a [^>]+>\s*Raw\s*</a>' | tidy -quiet)
 
 # count the number of raw URL anchor tags (and Gist files, by association)
 file_count=$(echo $temp_doc | xmllint --html --xpath "count(//a/@href)" -)
