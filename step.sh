@@ -1,15 +1,16 @@
 #!/bin/bash
 
 gist_url_base="gist.github.com"
+gist_raw_url_base="gist.githubusercontent.com"
 
 echo
 echo "gist_url: ${gist_url}"
 
 # Validate gist_url
 if [ "${gist_url}" != "" ]; then
-	if [[ "${gist_url}" != "http://$gist_url_base"* ]] && [[ "${gist_url}" != "https://$gist_url_base"* ]];then
+	if [[ "${gist_url}" != "http://$gist_url_base"* ]] && [[ "${gist_url}" != "https://$gist_url_base"* ]] && [[ "${gist_url}" != "https://$gist_raw_url_base"* ]]; then
 		echo
-		echo "gist_url must be a valid Gist URL (containing '$gist_url_base'). Terminating..."
+		echo "gist_url must be a valid Gist URL (containing '$gist_url_base' or '$gist_raw_url_base'). Terminating..."
 		echo
 		exit 1
 	fi
@@ -20,29 +21,33 @@ else
 	exit 1
 fi
 
-echo
-echo "---------------------------------------------------"
-echo "--- Fetching \"raw\" Gist URL(s) from: ${gist_url}"
-echo
-echo "--- Warning messages from tidy command (disregard):"
-
-# construct an XHTML doc to contain the extracted raw URL anchor tags
-temp_doc=$(curl -sSL "${gist_url}" | tac | tac | grep -Pzoi '<a [^>]+>\s*Raw\s*</a>' | tidy -quiet)
-
-# count the number of raw URL anchor tags (and Gist files, by association)
-file_count=$(echo $temp_doc | xmllint --html --xpath "count(//a/@href)" -)
-
-echo
-echo "--- Number of files found in Gist: $file_count"
-echo "---------------------------------------------------"
-
-# declare an array to contain the raw URL strings
+# declare an array to contain the raw gist URL strings
 declare -a raw_urls
 
-# extract each raw URL from the anchor tags and place in the array
-for (( i=1; i <= $file_count; i++ )); do 
-    raw_urls[$i]="$(echo $temp_doc | xmllint --html --xpath 'string(//a['$i']/@href)' -)"
-done
+if [[ "${gist_url}" == "https://$gist_raw_url_base"* ]]; then
+  raw_urls[1]="${gist_url}"
+else
+  echo
+  echo "---------------------------------------------------"
+  echo "--- Fetching \"raw\" Gist URL(s) from: ${gist_url}"
+  echo
+  echo "--- Warning messages from tidy command (disregard):"
+
+  # construct an XHTML doc to contain the extracted raw URL anchor tags
+  temp_doc=$(curl -sSL "${gist_url}" | tac | tac | grep -Pzoi '<a [^>]+>\s*Raw\s*</a>' | tidy -quiet)
+
+  # count the number of raw URL anchor tags (and Gist files, by association)
+  file_count=$(echo $temp_doc | xmllint --html --xpath "count(//a/@href)" -)
+
+  echo
+  echo "--- Number of files found in Gist: $file_count"
+  echo "---------------------------------------------------"
+
+  # extract each raw URL from the anchor tags and place in the array
+  for (( i=1; i <= $file_count; i++ )); do 
+      raw_urls[$i]="$(echo $temp_doc | xmllint --html --xpath 'string(//a['$i']/@href)' -)"
+  done
+fi
 
 # A var to hold the current Gist file number, since i below is an iterator, not an index.
 j=1
@@ -51,8 +56,12 @@ j=1
 for i in "${raw_urls[@]}"
 do
 
-	# construct the complete raw URL, since the urls from the anshors are relative URLs
-	raw_url="https://$gist_url_base$i"
+  if [[ "$i" == "https://"* ]]; then
+    raw_url="$i"
+  else
+    # construct the complete raw URL, since the urls from the anshors are relative URLs
+    raw_url="https://$gist_url_base$i"
+  fi
 
 	echo
 	echo "---------------------------------------------------"
